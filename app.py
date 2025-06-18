@@ -3,20 +3,18 @@ import torch
 import torchvision.transforms as transforms
 from torchvision import models
 from PIL import Image
-import gdown
 import os
 
-# Inisialisasi path dan url Google Drive
+# Inisialisasi path model (model harus ada di folder project)
 MODEL_PATH = 'corn_leaf_disease_model.pth'
-GDRIVE_URL = 'https://drive.google.com/uc?id=1cnASW6PqPhynaaw6ZXV2PbuiJSeAGQGX'  # ID yang kamu kirim sebelumnya
 
 CLASS_NAMES = ['blight', 'common_rust', 'gray_leaf_spot', 'healthy']
 IMG_SIZE = 224  # Sesuai input size ResNet
 
-# Download model jika belum ada
+# Cek apakah model ada
 if not os.path.exists(MODEL_PATH):
-    with st.spinner('📥 Downloading model...'):
-        gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
+    st.error(f"❌ Model tidak ditemukan di path: {MODEL_PATH}")
+    st.stop()
 
 # Load Model
 @st.cache_resource
@@ -46,7 +44,7 @@ def predict_image(image, model):
         return label, confidence
 
 # Streamlit UI
-st.title("🌽 Deteksi Penyakit Daun Jagung (PyTorch Version)")
+st.title("🌽 Deteksi Penyakit Daun Jagung ")
 st.write("Upload gambar daun jagung, lalu sistem akan mendeteksi penyakit berdasarkan model yang dilatih.")
 
 uploaded_file = st.file_uploader("📤 Upload Gambar Daun Jagung", type=["jpg", "jpeg", "png"])
