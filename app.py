@@ -1,22 +1,26 @@
-# app.py
 import streamlit as st
 import numpy as np
 from PIL import Image
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
 import os
+import gdown
 
-# List kelas sesuai dataset kamu
-CLASS_NAMES = ['Blight', 'Common Rust', 'Gray Leaf Spot', 'Healthy']
+# Daftar kelas
+CLASS_NAMES = ['blight', 'common rust', 'gray leaf spot', 'healthy']
 IMG_SIZE = (150, 150)
-MODEL_PATH = "corn_leaf_disease_model.h5"
 
-# Fungsi untuk load model
+# Path model dan ID Google Drive
+MODEL_PATH = "corn_leaf_disease_model.h5"
+GOOGLE_DRIVE_FILE_ID = "1cnASW6PqPhynaaw6ZXV2PbuiJSeAGQGX"
+
+# Fungsi untuk load model (otomatis download kalau belum ada)
 @st.cache_resource
 def load_cnn_model():
     if not os.path.exists(MODEL_PATH):
-        st.error(f"Model tidak ditemukan di {MODEL_PATH}")
-        return None
+        with st.spinner('Mengunduh model dari Google Drive...'):
+            url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
+            gdown.download(url, MODEL_PATH, quiet=False)
     return load_model(MODEL_PATH)
 
 # Fungsi prediksi gambar
@@ -32,9 +36,9 @@ def predict_image(img, model):
 
     return pred_label, confidence
 
-# Tampilan Streamlit
+# UI Streamlit
 st.title("🌽 Deteksi Penyakit Daun Jagung")
-st.write("Upload gambar daun jagung, lalu sistem akan mendeteksi penyakit berdasarkan model yang sudah dilatih.")
+st.write("Upload gambar daun jagung, lalu sistem akan mendeteksi penyakit berdasarkan model yang dilatih dari dataset.")
 
 # Load model
 model = load_cnn_model()
@@ -49,4 +53,4 @@ if uploaded_file and model:
     if st.button("🔍 Prediksi Gambar"):
         with st.spinner("Sedang memproses..."):
             label, confidence = predict_image(image, model)
-            st.success(f"✅ Hasil Prediksi: **{label}** dengan keyakinan **{confidence * 100:.2f}%**")
+            st.success(f"✅ Hasil Prediksi: **{label}** ({confidence * 100:.2f}%)")
