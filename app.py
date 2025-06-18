@@ -1,53 +1,57 @@
 import streamlit as st
-import numpy as np
+import torch
+import torchvision.transforms as transforms
+from torchvision import models
 from PIL import Image
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.image import img_to_array
-import os
 import gdown
+import os
 
-# Daftar kelas
-CLASS_NAMES = ['blight', 'common rust', 'gray leaf spot', 'healthy']
-IMG_SIZE = (150, 150)
+# Download model dari Google Drive jika belum ada
+MODEL_PATH = 'corn_leaf_disease_model.pth'
+GDRIVE_URL = 'https://drive.google.com/uc?id=1cnASW6PqPhynaaw6ZXV2PbuiJSeAGQGX'
 
-# Path model dan ID Google Drive
-MODEL_PATH = "corn_leaf_disease_model.h5"
-GOOGLE_DRIVE_FILE_ID = "1cnASW6PqPhynaaw6ZXV2PbuiJSeAGQGX"
+CLASS_NAMES = ['blight', 'common_rust', 'gray_leaf_spot', 'healthy']
+IMG_SIZE = 224  # Ukuran default untuk ResNet
 
-# Fungsi untuk load model (otomatis download kalau belum ada)
+if not os.path.exists(MODEL_PATH):
+    with st.spinner('Downloading model...'):
+        gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
+
+# Load Pretrained Model
 @st.cache_resource
-def load_cnn_model():
-    if not os.path.exists(MODEL_PATH):
-        with st.spinner('Mengunduh model dari Google Drive...'):
-            url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
-            gdown.download(url, MODEL_PATH, quiet=False)
-    return load_model(MODEL_PATH)
+def load_model():
+    model = models.resnet18(pretrained=False)
+    model.fc = torch.nn.Linear(model.fc.in_features, len(CLASS_NAMES))
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
+    model.eval()
+    return model
 
-# Fungsi prediksi gambar
-def predict_image(img, model):
-    img = img.resize(IMG_SIZE)
-    img_array = img_to_array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+model = load_model()
 
-    prediction = model.predict(img_array)[0]
-    pred_index = np.argmax(prediction)
-    pred_label = CLASS_NAMES[pred_index]
-    confidence = float(prediction[pred_index])
+# Image Preprocessing
+transform = transforms.Compose([
+    transforms.Resize((IMG_SIZE, IMG_SIZE)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
 
-    return pred_label, confidence
+def predict_image(image, model):
+    image = transform(image).unsqueeze(0)
+    with torch.no_grad():
+        outputs = model(image)
+        _, predicted = torch.max(outputs, 1)
+        confidence = torch.nn.functional.softmax(outputs, dim=1)[0][predicted].item()
+        label = CLASS_NAMES[predicted.item()]
+        return label, confidence
 
-# UI Streamlit
-st.title("🌽 Deteksi Penyakit Daun Jagung")
-st.write("Upload gambar daun jagung, lalu sistem akan mendeteksi penyakit berdasarkan model yang dilatih dari dataset.")
+# Streamlit UI
+st.title("🌽 Deteksi Penyakit Daun Jagung (PyTorch Version)")
+st.write("Upload gambar daun jagung, lalu sistem akan mendeteksi penyakit berdasarkan model yang dilatih.")
 
-# Load model
-model = load_cnn_model()
-
-# Upload gambar
 uploaded_file = st.file_uploader("📤 Upload Gambar Daun Jagung", type=["jpg", "jpeg", "png"])
 
-if uploaded_file and model:
-    image = Image.open(uploaded_file).convert("RGB")
+if uploaded_file:
+    image = Image.open(uploaded_file).convert('RGB')
     st.image(image, caption="🖼️ Gambar yang Diupload", use_column_width=True)
 
     if st.button("🔍 Prediksi Gambar"):
